@@ -39,12 +39,13 @@ class DHTest
     self.attach_volume v, server
     server.reload
     self.detach_volume v, server
-    self.deleteServer server
-    self.deleteSecGroup sec_group.id
+    self.delete_server server
+    self.delete_sec_group sec_group.id
     self.destroy_ip ip
     self.delete_volume v
   end
 
+  # Authenticates to keystone
   def connect
     puts "Authenticating to #{@auth_url}"
     @conn = Fog::Compute.new({
@@ -56,6 +57,7 @@ class DHTest
     })
   end
 
+  # Gets a list of images, prints them to the screen and returns the first one
   def get_images
     puts "Getting image list"
     images = @conn.list_images
@@ -67,6 +69,7 @@ class DHTest
     return images.body['images'][0]
   end
 
+  # Gets a list of flavors, prints them to the screen and returns the first one
   def get_flavors
     puts "Getting flavor list"
     flavors = @conn.list_flavors
@@ -78,6 +81,7 @@ class DHTest
     return flavors.body['flavors'][0]
   end
 
+  # Gets a list of servers, prints them to the screen and returns them
   def get_servers
     puts "Getting server list"
     servers = @conn.list_servers
@@ -89,6 +93,7 @@ class DHTest
     return servers.body['servers']
   end
 
+  # Gets a list of security groups, prints them to the screen and returns them
   def get_security_groups
     puts "Getting security group list"
     groups = @conn.list_security_groups
@@ -100,21 +105,26 @@ class DHTest
     return groups.body['security_groups']
   end
 
+  # Get an image
   def get_image(image_id)
     puts "Getting image #{image_id}"
     image = @conn.images.get(image_id)
     return image
   end
 
+  # Get a flavor
   def get_flavor(flavor_id)
     puts "Getting flavor #{flavor_id}"
     flavor = @conn.flavors.get(flavor_id)
     return flavor
   end
 
+  # Create a security group and add a rule for port 22
   def create_sec_group(name)
     puts "Creating security group #{name}"
     @conn.create_security_group name, 'test group'
+
+    # Get the security group you just created
     for security_group in @conn.security_groups.all
       if security_group.name == name
         test_security_group = security_group
@@ -122,16 +132,19 @@ class DHTest
       end
     end
 
+    # Add the rule for port 22
     puts "Creating security group rule for port 22"
     @conn.security_group_rules.create :ip_protocol => 'TCP', :from_port => 22, :to_port => 22, :parent_group_id => test_security_group.id
     return test_security_group
   end
 
-  def deleteSecGroup(group_id)
+  # Delete a security group
+  def delete_sec_group(group_id)
     puts "Deleting security group #{group_id}"
     @conn.delete_security_group group_id
   end
 
+  # Create a server and wait until it is ready
   def create_server flavor, image, security_group
     puts "Creating server #{@instance_name}"
     instance = @conn.servers.create :name => @instance_name,
@@ -151,7 +164,8 @@ class DHTest
     return instance
   end
 
-  def deleteServer instance
+  # Delete a server and wait for it to delete
+  def delete_server instance
     puts "Deleting instance"
     if not instance.destroy
       Kernel.abort("Failed to destroy instance")
@@ -167,25 +181,30 @@ class DHTest
     end
   end
 
+  # Get a floating IP
   def get_ip
     puts "Getting IP to attach to server"
     return @conn.addresses.create
   end
 
+  # Assign a floating IP to an instance
   def assign_ip instance, ip
     puts "Attaching IP to server"
     instance.associate_address(ip.ip)
   end
 
+  # Detach a floating IP from an instance
   def remove_ip instance, ip
     puts "Detaching IP from server"
     instance.disassociate_address(ip.ip)
   end
 
+  # Destroys an ip address
   def destroy_ip ip
     ip.destroy
   end
 
+  # Creates a 1G volume with the description "Fogtest volume" and returns it
   def create_volume name
     puts "Creating volume"
     @conn.create_volume name, 'Fogtest volume', 1
@@ -196,16 +215,22 @@ class DHTest
     end
   end
 
+  # Lists volumes
   def list_volumes
     puts "Listing_volumes"
     return @conn.volumes.all
   end
 
+  # Attaches a volume to an instance
   def attach_volume vol, instance
     puts "Attaching volume to instance"
 
+    # Attach the volume
     instance.attach_volume vol.id, "/dev/vdb"
+
+    # Wait for the volume to attach
     while 1
+      puts "Waiting for the volume to attach"
       instance.reload
       for volume in instance.volumes
         if volume.name = vol.name
@@ -215,11 +240,13 @@ class DHTest
     end
   end
 
+  # Detach the volume from the instance
   def detach_volume vol, instance
     puts "Detaching volume from instance"
     return instance.detach_volume vol.id
   end
 
+  # Destroy the volume
   def delete_volume vol
     puts "Destroying volume"
     vol.destroy
